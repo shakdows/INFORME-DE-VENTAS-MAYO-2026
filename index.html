@@ -401,27 +401,51 @@ async function startCamera(){
   }
 }
 const dist=function(a,b){return Math.hypot(a.x-b.x,a.y-b.y);};
-const extended=function(lm,tip,pip){return dist(lm[tip],lm[0])>dist(lm[pip],lm[0])*1.05;};
+// dedo extendido: punta mas lejos de la muneca que el nudillo PIP (tolerante)
+const extended=function(lm,tip,pip){return dist(lm[tip],lm[0])>dist(lm[pip],lm[0])*0.98;};
 function handleGesture(name,lm,now){
-  if(!lm){ status.innerHTML='\ud83d\udc4b Muestra tu mano a la c\u00e1mara'; laser.style.display='none'; return; }
+  if(!lm){ status.innerHTML='\ud83d\udc4b Muestra tu mano a la c\u00e1mara'; laser.style.display='none'; armed=true; return; }
   var idx=extended(lm,8,6), mid=extended(lm,12,10), ring=extended(lm,16,14), pinky=extended(lm,20,18), thumb=extended(lm,4,2);
-  var isPointing=idx&&!mid;
-  var dx=lm[8].x-lm[5].x, dy=lm[8].y-lm[5].y, horizontal=Math.abs(dx)>Math.abs(dy);
+  var cnt=(idx?1:0)+(mid?1:0)+(ring?1:0)+(pinky?1:0);
+  var dx=lm[8].x-lm[5].x, dy=lm[8].y-lm[5].y, horizontal=Math.abs(dx)>=Math.abs(dy);
   var invert=document.getElementById('invert').checked, cooldownOK=now-lastFire>1000;
-  if(idx&&mid&&ring&&pinky){ if(!palmStart)palmStart=now; status.innerHTML='\u270b Palma \u00b7 mant\u00e9n para apag\u00f3n';
+
+  // PALMA ABIERTA (4 dedos) -> apagon tras 2s
+  if(cnt>=4){ if(!palmStart)palmStart=now; status.innerHTML='\u270b Palma \u00b7 mant\u00e9n 2s para apag\u00f3n';
     if(now-palmStart>2000&&cooldownOK){toggleBlackout();lastFire=now;palmStart=0;} laser.style.display='none'; return; } else palmStart=0;
-  if(!idx&&!mid&&!ring&&!pinky){ status.innerHTML='\u270a Pu\u00f1o \u00b7 zoom'; if(armed&&cooldownOK){toggleZoom();armed=false;lastFire=now;} laser.style.display='none'; return; }
+
+  // PUNO (0 dedos) -> zoom
+  if(cnt===0&&!thumb){ status.innerHTML='\u270a Pu\u00f1o \u00b7 zoom'; if(armed&&cooldownOK){toggleZoom();armed=false;lastFire=now;} laser.style.display='none'; return; }
+
+  // VICTORY (indice+medio) -> vista general
   if(idx&&mid&&!ring&&!pinky){ status.innerHTML='\u270c\ufe0f Vista general'; if(armed&&cooldownOK){toggleOverview();armed=false;lastFire=now;} laser.style.display='none'; return; }
+
+  // SHAKA (pulgar+indice+menique) -> panel en vivo
   if(thumb&&idx&&pinky&&!mid&&!ring){ status.innerHTML='\ud83e\udd19 Abriendo panel en vivo\u2026'; if(armed&&cooldownOK){window.open(DASHBOARD_URL,'_blank');armed=false;lastFire=now;} laser.style.display='none'; return; }
-  if(thumb&&!idx&&!mid&&!ring&&!pinky){ status.innerHTML='\ud83d\udc4d \u00a1Bien!'; if(armed&&cooldownOK){confetti();armed=false;lastFire=now;} laser.style.display='none'; return; }
-  if(isPointing){
-    if(horizontal){ laser.style.display='none'; var goRight=dx>0; if(invert)goRight=!goRight;
-      status.innerHTML=goRight?'\ud83d\udc49 <b>Siguiente</b>':'\ud83d\udc48 <b>Anterior</b>';
-      if(armed&&cooldownOK){goRight?next():prev();armed=false;lastFire=now;} }
-    else { if(dy<0){ status.innerHTML='\u261d\ufe0f Puntero l\u00e1ser'; laser.style.display='block';
-        laser.style.left=((1-lm[8].x)*innerWidth)+'px'; laser.style.top=(lm[8].y*innerHeight)+'px'; }
-      else { status.innerHTML='\u00cdndice detectado'; laser.style.display='none'; } }
-  } else { status.innerHTML='Mano detectada \u00b7 apunta con el \u00edndice'; laser.style.display='none'; armed=true; }
+
+  // PULGAR ARRIBA -> confeti
+  if(thumb&&cnt===0){ status.innerHTML='\ud83d\udc4d \u00a1Bien!'; if(armed&&cooldownOK){confetti();armed=false;lastFire=now;} laser.style.display='none'; return; }
+
+  // INDICE SOLO (tolerante: indice fuera, y al menos medio o anular abajo)
+  if(idx && cnt<=2 && !(mid&&ring)){
+    // laser solo si apunta claramente hacia ARRIBA
+    if(!horizontal && dy<-0.04){
+      status.innerHTML='\u261d\ufe0f Puntero l\u00e1ser';
+      laser.style.display='block';
+      laser.style.left=((1-lm[8].x)*innerWidth)+'px'; laser.style.top=(lm[8].y*innerHeight)+'px';
+      return;
+    }
+    laser.style.display='none';
+    // cualquier inclinacion lateral cuenta como avanzar/retroceder
+    var goRight=dx>0; if(invert)goRight=!goRight;
+    status.innerHTML=goRight?'\ud83d\udc49 <b>SIGUIENTE</b>':'\ud83d\udc48 <b>ANTERIOR</b>';
+    if(armed&&cooldownOK){ goRight?next():prev(); armed=false; lastFire=now; }
+    return;
+  }
+
+  // mano visible pero sin gesto claro -> re-armar
+  status.innerHTML='\u270b Mano detectada \u00b7 apunta con 1 dedo de lado';
+  laser.style.display='none'; armed=true;
 }
 function loop(){ if(!running)return;
   if(video.currentTime!==lastTime&&recognizer){ lastTime=video.currentTime;
