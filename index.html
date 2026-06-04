@@ -86,6 +86,15 @@ h2{font-family:var(--serif);font-weight:700;font-size:clamp(26px,4.4vw,52px);lin
 #video{width:100%;display:block;transform:scaleX(-1)}
 #status{padding:9px 11px;font-size:12px;background:var(--panel);color:var(--gold2);min-height:20px;font-weight:600;font-family:var(--sans)}
 #status b{color:var(--gold)}
+/* modo oculto: el video desaparece, queda solo una barra mini de estado */
+#cam.hidden-cam{width:auto;max-width:210px;border-radius:10px;border-color:transparent;background:rgba(28,28,28,.55);box-shadow:none}
+#cam.hidden-cam #video{display:none}
+#cam.hidden-cam #status{font-size:11px;padding:6px 10px;opacity:.7}
+/* boton flotante para alternar camara */
+#camToggle{position:fixed;right:14px;top:14px;z-index:61;width:38px;height:38px;border-radius:10px;border:1px solid var(--panel2);
+  background:var(--panel);color:var(--gold);font-size:17px;cursor:pointer;display:none;align-items:center;justify-content:center;transition:.15s}
+#camToggle.show{display:flex}
+#camToggle:hover{background:#000}
 #laser{position:fixed;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle,#E11900,rgba(225,25,0,.4) 60%,transparent 70%);
   box-shadow:0 0 20px 6px rgba(225,25,0,.55);pointer-events:none;z-index:70;display:none;transform:translate(-50%,-50%)}
 
@@ -157,12 +166,14 @@ h2{font-family:var(--serif);font-weight:700;font-size:clamp(26px,4.4vw,52px);lin
 <div id="overview"></div>
 
 <div id="cam"><video id="video" autoplay playsinline muted></video><div id="status">Iniciando&hellip;</div></div>
+<button id="camToggle" title="Mostrar/ocultar c&aacute;mara">&#128065;</button>
 
 <div id="controls">
   <button class="btn" id="prevBtn">&larr; Anterior</button>
   <button class="btn" id="nextBtn">Siguiente &rarr;</button>
   <button class="btn" id="fsBtn">&#9974; Pantalla completa</button>
   <button class="btn" id="ovBtn">&#9638; Vista general</button>
+  <button class="btn" id="hideCamBtn">&#128065; Ocultar c&aacute;mara</button>
   <button class="btn primary" id="dashBtn">&#128202; Panel en vivo &#8599;</button>
   <label class="toggle"><input type="checkbox" id="invert"> Invertir izq/der</label>
 </div>
@@ -340,6 +351,23 @@ document.getElementById('dashBtn').onclick=function(){window.open(DASHBOARD_URL,
 document.getElementById('navPrev').onclick=prev;
 document.getElementById('navNext').onclick=next;
 
+/* ocultar / mostrar camara (sigue detectando gestos, solo no se ve) */
+function setCamHidden(hidden){
+  var camEl=document.getElementById('cam');
+  var tgl=document.getElementById('camToggle');
+  var btn=document.getElementById('hideCamBtn');
+  if(hidden){ camEl.classList.add('hidden-cam'); if(btn) btn.innerHTML='\ud83d\udc41 Mostrar c\u00e1mara'; }
+  else { camEl.classList.remove('hidden-cam'); if(btn) btn.innerHTML='\ud83d\udc41 Ocultar c\u00e1mara'; }
+}
+function toggleCam(){ document.getElementById('cam').classList.toggle('hidden-cam');
+  var hidden=document.getElementById('cam').classList.contains('hidden-cam');
+  var btn=document.getElementById('hideCamBtn'); if(btn) btn.innerHTML=hidden?'\ud83d\udc41 Mostrar c\u00e1mara':'\ud83d\udc41 Ocultar c\u00e1mara';
+}
+document.getElementById('camToggle').onclick=toggleCam;
+document.getElementById('hideCamBtn').onclick=toggleCam;
+// tecla C para ocultar/mostrar camara
+addEventListener('keydown',function(e){ if(e.key.toLowerCase()==='c') toggleCam(); });
+
 /* ESCENA 3D DE ENGRANAJES (igual que el informe) */
 const bg=document.getElementById('bg3d');
 let mx=0,my=0,kick=0;
@@ -465,7 +493,9 @@ document.getElementById('startBtn').onclick=async function(){
   var okCam=await startCamera(); if(!okCam)return;
   document.getElementById('start').style.display='none';
   var okModel=await initModel(); if(!okModel){running=false;return;}
-  running=true; status.innerHTML='Listo \u00b7 muestra tu mano'; loop();
+  running=true; status.innerHTML='Listo \u00b7 muestra tu mano';
+  document.getElementById('camToggle').classList.add('show');
+  loop();
 };
 document.getElementById('startNoCam').onclick=function(){ document.getElementById('start').style.display='none'; cam.classList.remove('show'); show(0); };
 
